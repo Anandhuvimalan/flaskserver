@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Business Email Extractor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen">
+  <!-- Admin Button -->
+  <a href="{{ url_for('setuppage') }}" class="fixed top-6 right-6 bg-gradient-to-r from-gray-600 to-gray-500 hover:from-gray-500 hover:to-gray-400 text-gray-100 px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-xl">
+      ⚙️ API Setup
+  </a>
+
+  <div class="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+      <h1 class="text-center text-4xl md:text-5xl font-extrabold mb-10 bg-gradient-to-r from-gray-300 to-gray-400 bg-clip-text text-transparent">
+          Business Email Extractor
+      </h1>
+
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+              <div class="fixed top-4 left-1/2 transform -translate-x-1/2 space-y-2 z-50">
+                  {% for category, message in messages %}
+                      <div class="flex items-center bg-gray-800/90 p-4 rounded-lg shadow-xl border border-gray-600 backdrop-blur-sm">
+                          <span class="text-gray-300 font-medium">
+                              {{ message }}
+                          </span>
+                          <button class="ml-4 text-gray-400 hover:text-gray-200 transition-colors" onclick="this.parentElement.remove()">
+                              ✕
+                          </button>
+                      </div>
+                  {% endfor %}
+              </div>
+          {% endif %}
+      {% endwith %}
+
+      <!-- Form Container -->
+      <div class="bg-gray-800/70 backdrop-blur-lg rounded-2xl p-8 shadow-2xl border border-gray-700">
+          <form method="post" action="{{ url_for('index') }}" class="space-y-8">
+              <!-- Search Query -->
+              <div>
+                  <label class="block text-gray-400 font-semibold mb-3 text-lg">Search Query</label>
+                  <input type="text" id="search_query" name="search_query" value="hotels" 
+                         class="w-full px-5 py-3 bg-gray-900/50 border-2 border-gray-600 rounded-xl focus:border-gray-500 focus:ring-4 focus:ring-gray-500/20 text-gray-200 placeholder-gray-500 transition-all duration-300"
+                         required>
+              </div>
+
+              <!-- Location Row -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                      <label class="block text-gray-400 font-semibold mb-3 text-lg">Latitude</label>
+                      <input type="text" id="latitude" name="latitude" value="37.7749"
+                             class="w-full px-5 py-3 bg-gray-900/50 border-2 border-gray-600 rounded-xl focus:border-gray-500 focus:ring-4 focus:ring-gray-500/20 text-gray-200 placeholder-gray-500 transition-all duration-300"
+                             required>
+                  </div>
+                  <div>
+                      <label class="block text-gray-400 font-semibold mb-3 text-lg">Longitude</label>
+                      <input type="text" id="longitude" name="longitude" value="-122.4194"
+                             class="w-full px-5 py-3 bg-gray-900/50 border-2 border-gray-600 rounded-xl focus:border-gray-500 focus:ring-4 focus:ring-gray-500/20 text-gray-200 placeholder-gray-500 transition-all duration-300"
+                             required>
+                  </div>
+              </div>
+
+              <!-- Numbers Row -->
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                      <label class="block text-gray-400 font-semibold mb-3 text-lg">Number of Results</label>
+                      <input type="number" id="num_results" name="num_results" value="10"
+                             class="w-full px-5 py-3 bg-gray-900/50 border-2 border-gray-600 rounded-xl focus:border-gray-500 focus:ring-4 focus:ring-gray-500/20 text-gray-200 placeholder-gray-500 transition-all duration-300"
+                             required>
+                  </div>
+                  <div>
+                      <label class="block text-gray-400 font-semibold mb-3 text-lg">Max Pages</label>
+                      <input type="number" id="max_pages" name="max_pages" value="20"
+                             class="w-full px-5 py-3 bg-gray-900/50 border-2 border-gray-600 rounded-xl focus:border-gray-500 focus:ring-4 focus:ring-gray-500/20 text-gray-200 placeholder-gray-500 transition-all duration-300"
+                             required>
+                  </div>
+              </div>
+
+              <!-- Submit Button -->
+              <button type="submit" 
+                      class="w-full bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-gray-100 font-bold py-4 rounded-xl transition-all duration-300 transform hover:scale-[1.02] shadow-lg hover:shadow-xl">
+                  🔍 Start Extraction
+              </button>
+          </form>
+      </div>
+  </div>
+
+  <!-- Progress Indicator -->
+  <div id="progress-indicator" class="fixed bottom-0 left-0 right-0 p-4 bg-gray-800 text-gray-100 text-center">
+      Fetched results: (0/0)<br>
+      Latest business fetched: None
+  </div>
+
+  <script>
+    // Poll the /progress endpoint every second to update the progress indicator
+    const interval = setInterval(function(){
+        fetch('/progress')
+        .then(response => response.json())
+        .then(data => {
+            let progressDiv = document.getElementById("progress-indicator");
+            if(data.error) {
+                progressDiv.innerHTML = "Error: " + data.error;
+                return;
+            }
+            progressDiv.innerHTML = `Fetched results: (${data.current}/${data.total})<br>
+                                     Latest business fetched: ${data.last_business || 'N/A'}`;
+            if(data.complete) {
+                clearInterval(interval);
+                // Once complete, redirect to the result page where the user can download the CSV
+                window.location.href = '/result';
+            }
+        });
+    }, 1000);
+  </script>
+</body>
+</html>

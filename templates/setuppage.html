@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Setup</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Heroicons CDN -->
+    <script src="https://unpkg.com/@heroicons/v2.0.18/24/outline/index.js"></script>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 min-h-screen flex items-center justify-center">
+    <div class="max-w-md w-full px-4">
+        <div class="bg-gray-800/70 backdrop-blur-lg rounded-2xl shadow-2xl p-8 border border-gray-700">
+            <div class="mb-6">
+                <h1 class="text-2xl font-bold text-gray-200 mb-1">API Key Configuration</h1>
+                <p class="text-gray-400">Manage your Google Maps API settings</p>
+            </div>
+
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    <div class="mb-6 space-y-3">
+                        {% for category, message in messages %}
+                            <div class="p-4 rounded-lg border-l-4 {% if category == 'error' %}bg-red-900/30 border-red-500 text-red-400{% else %}bg-green-900/30 border-green-500 text-green-400{% endif %}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- API Key Form -->
+            <form method="post" action="{{ url_for('setuppage') }}" class="space-y-6">
+                <div>
+                    <label for="api_key" class="block text-sm font-medium text-gray-400 mb-2">
+                        Google Maps API Key
+                    </label>
+                    <input type="text" id="api_key" name="api_key" value="{{ api_key }}" 
+                           class="w-full px-4 py-3 bg-gray-900/50 border-2 border-gray-600 rounded-xl focus:border-gray-500 focus:ring-4 focus:ring-gray-500/20 text-gray-200 placeholder-gray-500 transition-all duration-300"
+                           required>
+                </div>
+
+                <button type="submit" 
+                        class="w-full bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-500 hover:to-gray-600 text-gray-100 font-medium py-3 px-4 rounded-xl transition-all duration-300 transform hover:scale-[1.02] shadow-lg hover:shadow-xl">
+                    Update API Key
+                </button>
+            </form>
+
+            <!-- Back to Home -->
+            <div class="mt-6 text-center">
+                <a href="{{ url_for('index') }}" class="inline-flex items-center text-gray-400 hover:text-gray-300 transition-all duration-300 group">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" 
+                         stroke="currentColor" class="w-5 h-5 mr-2 group-hover:-translate-x-1 transition-transform">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                    </svg>
+                    Back to Home
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
