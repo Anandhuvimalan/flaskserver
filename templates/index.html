@@ -1,276 +1,576 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Business Email Extractor</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: {
-              50: '#f0f9ff',
-              100: '#e0f2fe',
-              200: '#bae6fd',
-              300: '#7dd3fc',
-              400: '#38bdf8',
-              500: '#0ea5e9',
-              600: '#0284c7',
-              700: '#0369a1',
-              800: '#075985',
-              900: '#0c4a6e',
-              950: '#082f49',
-            },
-          },
-          animation: {
-            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-          }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Business Email Scraper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom styles */
+        .progress-container {
+            width: 100%;
+            background-color: #f3f4f6;
+            border-radius: 0.5rem;
+            overflow: hidden;
         }
-      }
-    }
-  </script>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
-  <style>
-    body {
-      font-family: 'Inter', sans-serif;
-    }
-    .glass-effect {
-      backdrop-filter: blur(16px) saturate(180%);
-      background-color: rgba(17, 25, 40, 0.75);
-      border: 1px solid rgba(255, 255, 255, 0.125);
-    }
-  </style>
+        .progress-bar {
+            height: 0.75rem;
+            background-color: #10b981;
+            transition: width 0.3s ease;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #0ea5e9 0%, #10b981 100%);
+        }
+        .card {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+    </style>
 </head>
-<body class="bg-gradient-to-br from-gray-900 via-primary-900 to-gray-900 min-h-screen">
-  <div class="max-w-4xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
-      <div class="text-center mb-12">
-        <h1 class="text-4xl md:text-5xl font-extrabold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-primary-300 to-primary-100">
-            Business Email Extractor
-        </h1>
-        <p class="text-gray-300 max-w-2xl mx-auto">
-          Extract business emails from Google Maps listings with just a few clicks
-        </p>
-      </div>
-
-      <!-- Flash Messages -->
-      {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-              <div class="fixed top-4 left-1/2 transform -translate-x-1/2 space-y-2 z-50">
-                  {% for category, message in messages %}
-                      <div class="flex items-center glass-effect p-4 rounded-lg shadow-xl border border-gray-600 backdrop-blur-sm">
-                          <span class="text-gray-300 font-medium">
-                              {{ message }}
-                          </span>
-                          <button class="ml-4 text-gray-400 hover:text-gray-200 transition-colors" onclick="this.parentElement.remove()">
-                              ✕
-                          </button>
-                      </div>
-                  {% endfor %}
-              </div>
-          {% endif %}
-      {% endwith %}
-
-      <!-- Form Container with relative positioning -->
-      <div class="glass-effect rounded-2xl pt-12 pb-8 px-8 shadow-2xl relative">
-          <!-- API Setup Button positioned at the top right of the form container -->
-          <a href="{{ url_for('setuppage') }}" class="absolute top-4 right-4 bg-primary-700 hover:bg-primary-600 text-white px-4 py-2 rounded-xl transition-all duration-300 transform hover:scale-105 shadow-xl flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
-              </svg>
-              API Setup
-          </a>
-          <form method="post" action="{{ url_for('index') }}" class="space-y-8">
-              <!-- Search Query -->
-              <div>
-                  <label class="block text-gray-300 font-semibold mb-3 text-lg">Search Query</label>
-                  <div class="relative">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
-                      </svg>
-                    </div>
-                    <input type="text" id="search_query" name="search_query" placeholder="hotels, restaurants, coffee shops, etc." 
-                           class="w-full pl-10 px-5 py-3 bg-gray-900/50 border-2 border-gray-600 rounded-xl focus:border-primary-500 focus:ring-4 focus:ring-primary-500/20 text-gray-200 placeholder-gray-500 transition-all duration-300"
-                           required>
-                  </div>
-              </div>
-
-              <!-- Location Row -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                      <label class="block text-gray-300 font-semibold mb-3 text-lg">Latitude</label>
-                      <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
-                          </svg>
-                        </div>
-                        <input type="text" id="latitude" name="latitude" placeholder="37.7749"
-                               class="w-full pl-10 px-5 py-3 bg-gray-900/50 border-2 border-gray-600 rounded-xl focus:border-primary-500 focus:ring-4 focus:ring-primary-500/20 text-gray-200 placeholder-gray-500 transition-all duration-300"
-                               required>
-                      </div>
-                  </div>
-                  <div>
-                      <label class="block text-gray-300 font-semibold mb-3 text-lg">Longitude</label>
-                      <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
-                          </svg>
-                        </div>
-                        <input type="text" id="longitude" name="longitude" placeholder="-122.4194"
-                               class="w-full pl-10 px-5 py-3 bg-gray-900/50 border-2 border-gray-600 rounded-xl focus:border-primary-500 focus:ring-4 focus:ring-primary-500/20 text-gray-200 placeholder-gray-500 transition-all duration-300"
-                               required>
-                      </div>
-                  </div>
-              </div>
-
-              <!-- Numbers Row -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                      <label class="block text-gray-300 font-semibold mb-3 text-lg">Number of Results</label>
-                      <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
-                          </svg>
-                        </div>
-                        <input type="number" id="num_results" name="num_results" placeholder="10" min="1"
-                               class="w-full pl-10 px-5 py-3 bg-gray-900/50 border-2 border-gray-600 rounded-xl focus:border-primary-500 focus:ring-4 focus:ring-primary-500/20 text-gray-200 placeholder-gray-500 transition-all duration-300"
-                               required>
-                      </div>
-                      <p class="mt-2 text-sm text-gray-400">Number of business emails to extract (can be any value, e.g. 6000)</p>
-                  </div>
-                  <div>
-                      <label class="block text-gray-300 font-semibold mb-3 text-lg">Max Pages per Website <span class="text-gray-400 text-sm">(Optional)</span></label>
-                      <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M2 5a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5zm3.293 1.293a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 01-1.414-1.414L7.586 10 5.293 7.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" />
-                          </svg>
-                        </div>
-                        <input type="number" id="max_pages" name="max_pages" placeholder="20" min="1"
-                               class="w-full pl-10 px-5 py-3 bg-gray-900/50 border-2 border-gray-600 rounded-xl focus:border-primary-500 focus:ring-4 focus:ring-primary-500/20 text-gray-200 placeholder-gray-500 transition-all duration-300">
-                      </div>
-                      <p class="mt-2 text-sm text-gray-400">Limit pages crawled per website (default: 20)</p>
-                  </div>
-              </div>
-
-              <!-- Submit Button -->
-              <button type="submit" 
-                      class="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-500 hover:to-primary-600 text-white font-bold py-4 rounded-xl transition-all duration-300 transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center justify-center gap-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  Start Extraction
-              </button>
-          </form>
-      </div>
-
-      <!-- Progress Indicator placed below the form container -->
-      <div id="progress-indicator" class="mt-8 p-6 glass-effect text-gray-100 text-center rounded-xl">
-    <div class="flex flex-col items-center">
-      <div class="flex items-center gap-3 mb-4">
-        <div class="w-3 h-3 bg-primary-400 rounded-full animate-pulse-slow"></div>
-        <h3 class="text-xl font-semibold text-primary-300">Extraction Progress</h3>
-      </div>
-      <div class="w-full bg-gray-700 rounded-full h-2.5 mb-4">
-        <div id="progress-bar" class="bg-primary-500 h-2.5 rounded-full" style="width: 0%"></div>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full mb-4">
-        <div class="bg-gray-800/50 p-3 rounded-lg">
-          <div id="progress-text" class="font-medium">Fetched results: (0/0)</div>
-          <div id="latest-business" class="text-sm text-gray-400 truncate">Latest business: None</div>
+<body class="bg-gray-50 min-h-screen">
+    <div class="gradient-bg text-white py-6 shadow-lg">
+        <div class="container mx-auto px-4">
+            <h1 class="text-4xl font-bold text-center">Business Email Scraper</h1>
+            <p class="text-center mt-2 opacity-90">Extract business emails efficiently from Google Places</p>
         </div>
-        <div class="bg-gray-800/50 p-3 rounded-lg">
-          <div id="skipped-count" class="font-medium">Skipped businesses: 0</div>
-          <div class="text-sm text-gray-400">Will be saved separately</div>
-        </div>
-      </div>
-      <div class="w-full bg-gray-800/50 p-3 rounded-lg mb-2">
-        <div id="pages-crawled" class="font-medium">Pages crawled: 0</div>
-        <div id="debug-info" class="mt-1 text-xs text-gray-500">Ready to start extraction</div>
-      </div>
-      
-      <!-- Stop Button -->
-      <button id="stop-button" 
-              class="mt-4 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 transform hover:scale-[1.02] shadow-lg hover:shadow-xl flex items-center justify-center gap-2 hidden">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd" />
-          </svg>
-          Stop Extraction
-      </button>
     </div>
-</div>
-  </div>
-
-  <script>
-    // Poll the /progress endpoint every second to update the progress indicator
-    const interval = setInterval(function(){
-        fetch('/progress')
-        .then(response => response.json())
-        .then(data => {
-            let progressDiv = document.getElementById("progress-indicator");
-            let progressBar = document.getElementById("progress-bar");
-            let progressText = document.getElementById("progress-text");
-            let latestBusiness = document.getElementById("latest-business");
-            let skippedCount = document.getElementById("skipped-count");
-            let pagesCrawled = document.getElementById("pages-crawled");
-            let debugInfo = document.getElementById("debug-info");
-            let stopButton = document.getElementById("stop-button");
-            
-            if(data.error) {
-                progressDiv.innerHTML = "Error: " + data.error;
-                return;
-            }
-            
-            // Show stop button once extraction has started
-            if(data.current > 0 || data.pages_crawled > 0) {
-                stopButton.classList.remove("hidden");
-            }
-            
-            // Calculate percentage for progress bar
-            let percentage = data.total > 0 ? (data.current / data.total) * 100 : 0;
-            progressBar.style.width = percentage + "%";
-            
-            progressText.textContent = `Fetched results: (${data.current}/${data.total})`;
-            latestBusiness.textContent = `Latest business fetched: ${data.last_business || 'N/A'}`;
-            skippedCount.textContent = `Skipped businesses: ${data.skipped || 0}`;
-            pagesCrawled.textContent = `Pages crawled: ${data.pages_crawled || 0}`;
-            debugInfo.textContent = data.debug_info || 'Processing...';
-            
-            if(data.complete) {
-                clearInterval(interval);
-                // Hide stop button when complete
-                stopButton.classList.add("hidden");
-                // Once complete, redirect to the result page where the user can download the CSV
-                window.location.href = '/result';
-            }
-        });
-    }, 1000);
     
-    // Add event listener for stop button
-    document.getElementById("stop-button").addEventListener("click", function() {
-        // Change button appearance to indicate stopping
-        this.disabled = true;
-        this.innerHTML = `
-            <svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Stopping...
-        `;
+    <div class="container mx-auto py-8 px-4">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Configuration Panel -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-xl shadow-md p-6 card">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-emerald-100 p-2 rounded-lg mr-3">
+                            <i class="fas fa-cog text-emerald-600 text-xl"></i>
+                        </div>
+                        <h2 class="text-xl font-semibold text-gray-800">Configuration</h2>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label for="api-key" class="block text-sm font-medium text-gray-700 mb-1">Google Places API Key</label>
+                            <input type="text" id="api-key" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="Enter your API key">
+                        </div>
+                        
+                        <div>
+                            <label for="target-results" class="block text-sm font-medium text-gray-700 mb-1">Target Results</label>
+                            <input type="number" id="target-results" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500" value="100" min="1">
+                            <p class="text-xs text-gray-500 mt-1">Number of businesses with emails to collect</p>
+                        </div>
+                        
+                        <div>
+                            <label for="search-query" class="block text-sm font-medium text-gray-700 mb-1">Search Query</label>
+                            <input type="text" id="search-query" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500" value="restaurant" placeholder="E.g., restaurant, mining, agriculture">
+                            <p class="text-xs text-gray-500 mt-1">Free text search for any business type</p>
+                        </div>
+                        
+                        <div>
+                            <label for="cities-csv" class="block text-sm font-medium text-gray-700 mb-1">Cities CSV File</label>
+                            <div class="flex items-center">
+                                <input type="file" id="cities-csv" accept=".csv" class="hidden">
+                                <button id="upload-btn" class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                    <i class="fas fa-cloud-upload-alt mr-2"></i>
+                                    <span id="file-name">Upload CSV</span>
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">CSV should have columns: city, lat, lng</p>
+                        </div>
+                        
+                        <button id="start-btn" class="w-full bg-emerald-600 text-white py-3 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">
+                            <i class="fas fa-play mr-2"></i>
+                            Start Processing
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Progress Panel -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-xl shadow-md p-6 card">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-blue-100 p-2 rounded-lg mr-3">
+                            <i class="fas fa-chart-line text-blue-600 text-xl"></i>
+                        </div>
+                        <h2 class="text-xl font-semibold text-gray-800">Progress</h2>
+                    </div>
+                    
+                    <div id="error-container" class="hidden mb-4 p-4 rounded-md bg-red-50 border border-red-200">
+                        <p id="error-message" class="text-sm text-red-800"></p>
+                    </div>
+                    
+                    <!-- Current City Display -->
+                    <div id="current-city-container" class="mb-6 p-4 rounded-md bg-blue-50 border border-blue-100 hidden">
+                        <div class="flex items-center">
+                            <i class="fas fa-map-marker-alt text-blue-600 mr-3"></i>
+                            <div>
+                                <p class="text-sm text-gray-600">Currently processing:</p>
+                                <p id="current-city-name" class="text-lg font-semibold text-blue-800">-</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-6">
+                        <div>
+                            <div class="flex justify-between mb-2">
+                                <span class="text-sm font-medium text-gray-700">Overall Progress</span>
+                                <span id="progress-percent" class="text-sm font-medium text-gray-700">0%</span>
+                            </div>
+                            <div class="progress-container">
+                                <div id="progress-bar" class="progress-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-xs text-gray-500">Status</p>
+                                        <p id="status-text" class="text-sm font-medium text-gray-800">Not started</p>
+                                    </div>
+                                    <i class="fas fa-info-circle text-gray-400"></i>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-green-50 p-4 rounded-lg">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-xs text-gray-500">With Emails</p>
+                                        <p id="with-emails-count" class="text-sm font-medium text-green-800">0</p>
+                                    </div>
+                                    <i class="fas fa-envelope text-green-400"></i>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-yellow-50 p-4 rounded-lg">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-xs text-gray-500">Without Emails</p>
+                                        <p id="without-emails-count" class="text-sm font-medium text-yellow-800">0</p>
+                                    </div>
+                                    <i class="fas fa-envelope-open text-yellow-400"></i>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="space-y-3">
+                                <button id="stop-btn" class="w-full bg-red-600 text-white py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed hidden flex items-center justify-center">
+                                    <i class="fas fa-stop-circle mr-2"></i>
+                                    Stop Process
+                                </button>
+                                
+                                <button id="reset-btn" class="w-full bg-yellow-500 text-white py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 flex items-center justify-center">
+                                    <i class="fas fa-redo mr-2"></i>
+                                    Reset
+                                </button>
+                            </div>
+                            
+                            <div class="space-y-3">
+                                <button id="download-with-emails-btn" class="w-full bg-gray-200 text-gray-800 py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">
+                                    <i class="fas fa-download mr-2"></i>
+                                    Download With Emails
+                                </button>
+                                
+                                <button id="download-without-emails-btn" class="w-full bg-gray-200 text-gray-800 py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">
+                                    <i class="fas fa-download mr-2"></i>
+                                    Download Without Emails
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Stats Card -->
+                <div class="bg-white rounded-xl shadow-md p-6 mt-6 card">
+                    <div class="flex items-center mb-4">
+                        <div class="bg-purple-100 p-2 rounded-lg mr-3">
+                            <i class="fas fa-chart-pie text-purple-600 text-xl"></i>
+                        </div>
+                        <h2 class="text-xl font-semibold text-gray-800">Processing Stats</h2>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <p class="text-xs text-gray-500">Cities</p>
+                            <p id="cities-stats" class="text-sm font-medium text-gray-800">0 / 0</p>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <p class="text-xs text-gray-500">Hexagons</p>
+                            <p id="hexagons-stats" class="text-sm font-medium text-gray-800">0 / 0</p>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <p class="text-xs text-gray-500">Places</p>
+                            <p id="places-stats" class="text-sm font-medium text-gray-800">0</p>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <p class="text-xs text-gray-500">API Calls</p>
+                            <p id="api-calls-stats" class="text-sm font-medium text-gray-800">0</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <footer class="mt-12 py-6 bg-gray-800 text-white">
+        <div class="container mx-auto px-4 text-center">
+            <p>Business Email Scraper &copy; 2025</p>
+        </div>
+    </footer>
+    
+    <script>
+        // DOM elements
+        const apiKeyInput = document.getElementById('api-key');
+        const targetResultsInput = document.getElementById('target-results');
+        const searchQueryInput = document.getElementById('search-query');
+        const fileInput = document.getElementById('cities-csv');
+        const uploadBtn = document.getElementById('upload-btn');
+        const fileNameSpan = document.getElementById('file-name');
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const downloadWithEmailsBtn = document.getElementById('download-with-emails-btn');
+        const downloadWithoutEmailsBtn = document.getElementById('download-without-emails-btn');
+        const progressBar = document.getElementById('progress-bar');
+        const progressPercent = document.getElementById('progress-percent');
+        const statusText = document.getElementById('status-text');
+        const withEmailsCount = document.getElementById('with-emails-count');
+        const withoutEmailsCount = document.getElementById('without-emails-count');
+        const errorContainer = document.getElementById('error-container');
+        const errorMessage = document.getElementById('error-message');
+        const currentCityContainer = document.getElementById('current-city-container');
+        const currentCityName = document.getElementById('current-city-name');
+        const citiesStats = document.getElementById('cities-stats');
+        const hexagonsStats = document.getElementById('hexagons-stats');
+        const placesStats = document.getElementById('places-stats');
+        const apiCallsStats = document.getElementById('api-calls-stats');
         
-        // Call the stop endpoint
-        fetch('/stop_extraction')
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById("debug-info").textContent = "Stopping extraction... Please wait while we save the collected data.";
+        // Variables
+        let uploadedFileName = null;
+        let isProcessing = false;
+        let progressInterval = null;
+        
+        // Event listeners
+        uploadBtn.addEventListener('click', () => {
+            fileInput.click();
         });
-    });
-  </script>
+        
+        fileInput.addEventListener('change', async (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                fileNameSpan.textContent = file.name;
+                
+                // Upload the file
+                const formData = new FormData();
+                formData.append('cities_csv', file);
+                
+                try {
+                    uploadBtn.disabled = true;
+                    uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Uploading...';
+                    
+                    const response = await fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.error) {
+                        showError(data.error);
+                    } else {
+                        uploadedFileName = data.filename;
+                        hideError();
+                        showSuccess('File uploaded successfully!');
+                    }
+                } catch (error) {
+                    showError('Failed to upload file');
+                } finally {
+                    uploadBtn.disabled = false;
+                    uploadBtn.innerHTML = '<i class="fas fa-cloud-upload-alt mr-2"></i><span id="file-name">' + fileNameSpan.textContent + '</span>';
+                }
+            }
+        });
+        
+        startBtn.addEventListener('click', async () => {
+            if (isProcessing) return;
+            
+            // Validate inputs
+            if (!apiKeyInput.value) {
+                return showError('API key is required');
+            }
+            
+            if (!uploadedFileName) {
+                return showError('Please upload a CSV file');
+            }
+            
+            hideError();
+            
+            // Start the process
+            try {
+                startBtn.disabled = true;
+                startBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Starting...';
+                
+                const response = await fetch('/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        api_key: apiKeyInput.value,
+                        filename: uploadedFileName,
+                        target_results: parseInt(targetResultsInput.value) || 100,
+                        search_query: searchQueryInput.value || 'restaurant'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    showError(data.error);
+                    startBtn.disabled = false;
+                    startBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Start Processing';
+                } else {
+                    // Process started successfully
+                    isProcessing = true;
+                    startBtn.disabled = true;
+                    startBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Start Processing';
+                    stopBtn.classList.remove('hidden');
+                    
+                    // Show the current city container
+                    currentCityContainer.classList.remove('hidden');
+                    currentCityContainer.classList.add('pulse-animation');
+                    
+                    // Start polling for progress
+                    startProgressPolling();
+                }
+            } catch (error) {
+                showError('Failed to start process');
+                startBtn.disabled = false;
+                startBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Start Processing';
+            }
+        });
+        
+        stopBtn.addEventListener('click', async () => {
+            if (!isProcessing) return;
+            
+            try {
+                stopBtn.disabled = true;
+                stopBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Stopping...';
+                
+                const response = await fetch('/stop');
+                const data = await response.json();
+                
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    stopProgressPolling();
+                    isProcessing = false;
+                    startBtn.disabled = false;
+                    stopBtn.classList.add('hidden');
+                    stopBtn.innerHTML = '<i class="fas fa-stop-circle mr-2"></i>Stop Process';
+                    stopBtn.disabled = false;
+                    statusText.textContent = 'Stopped. Data is available for download.';
+                    showSuccess('Process stopped. You can download the data collected so far.');
+                    
+                    // Hide the current city container
+                    currentCityContainer.classList.add('hidden');
+                    currentCityContainer.classList.remove('pulse-animation');
+                }
+            } catch (error) {
+                showError('Failed to stop process');
+                stopBtn.disabled = false;
+                stopBtn.innerHTML = '<i class="fas fa-stop-circle mr-2"></i>Stop Process';
+            }
+        });
+        
+        resetBtn.addEventListener('click', async () => {
+            try {
+                resetBtn.disabled = true;
+                resetBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Resetting...';
+                
+                const response = await fetch('/reset');
+                const data = await response.json();
+                
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    // Reset UI
+                    isProcessing = false;
+                    uploadedFileName = null;
+                    fileNameSpan.textContent = 'Upload CSV';
+                    progressBar.style.width = '0%';
+                    progressPercent.textContent = '0%';
+                    statusText.textContent = 'Not started';
+                    withEmailsCount.textContent = '0';
+                    withoutEmailsCount.textContent = '0';
+                    citiesStats.textContent = '0 / 0';
+                    hexagonsStats.textContent = '0 / 0';
+                    placesStats.textContent = '0';
+                    apiCallsStats.textContent = '0';
+                    startBtn.disabled = false;
+                    stopBtn.classList.add('hidden');
+                    downloadWithEmailsBtn.disabled = true;
+                    downloadWithoutEmailsBtn.disabled = true;
+                    hideError();
+                    
+                    // Hide the current city container
+                    currentCityContainer.classList.add('hidden');
+                    currentCityContainer.classList.remove('pulse-animation');
+                    
+                    // Clear file input
+                    fileInput.value = '';
+                    
+                    // Show success message
+                    showSuccess('Reset successful. You can start a new process.');
+                }
+            } catch (error) {
+                showError('Failed to reset process');
+            } finally {
+                resetBtn.disabled = false;
+                resetBtn.innerHTML = '<i class="fas fa-redo mr-2"></i>Reset';
+            }
+        });
+        
+        downloadWithEmailsBtn.addEventListener('click', () => {
+            downloadWithEmailsBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Downloading...';
+            setTimeout(() => {
+                window.location.href = '/download/with_emails';
+                downloadWithEmailsBtn.innerHTML = '<i class="fas fa-download mr-2"></i>Download With Emails';
+            }, 500);
+        });
+        
+        downloadWithoutEmailsBtn.addEventListener('click', () => {
+            downloadWithoutEmailsBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Downloading...';
+            setTimeout(() => {
+                window.location.href = '/download/without_emails';
+                downloadWithoutEmailsBtn.innerHTML = '<i class="fas fa-download mr-2"></i>Download Without Emails';
+            }, 500);
+        });
+        
+        // Functions
+        function showError(message) {
+            errorContainer.classList.remove('hidden');
+            errorContainer.classList.remove('bg-green-50');
+            errorContainer.classList.remove('border-green-200');
+            errorContainer.classList.add('bg-red-50');
+            errorContainer.classList.add('border-red-200');
+            errorMessage.classList.remove('text-green-800');
+            errorMessage.classList.add('text-red-800');
+            errorMessage.textContent = message;
+        }
+        
+        function hideError() {
+            errorContainer.classList.add('hidden');
+            errorMessage.textContent = '';
+        }
+        
+        function showSuccess(message) {
+            errorContainer.classList.remove('hidden');
+            errorContainer.classList.remove('bg-red-50');
+            errorContainer.classList.remove('border-red-200');
+            errorContainer.classList.add('bg-green-50');
+            errorContainer.classList.add('border-green-200');
+            errorMessage.classList.remove('text-red-800');
+            errorMessage.classList.add('text-green-800');
+            errorMessage.textContent = message;
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                hideError();
+            }, 5000);
+        }
+        
+        function startProgressPolling() {
+            // Clear any existing interval
+            stopProgressPolling();
+            
+            // Start a new polling interval
+            progressInterval = setInterval(fetchProgress, 2000);
+            fetchProgress(); // Fetch immediately
+        }
+        
+        function stopProgressPolling() {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+        }
+        
+        async function fetchProgress() {
+            try {
+                const response = await fetch('/progress');
+                const data = await response.json();
+                
+                // Update UI
+                const progress = Math.round(data.progress);
+                progressBar.style.width = `${progress}%`;
+                progressPercent.textContent = `${progress}%`;
+                statusText.textContent = data.status;
+                withEmailsCount.textContent = data.businesses_with_email;
+                withoutEmailsCount.textContent = data.businesses_without_email;
+                
+                // Update current city name if available
+                if (data.current_city) {
+                    currentCityName.textContent = data.current_city;
+                    currentCityContainer.classList.remove('hidden');
+                } else {
+                    currentCityName.textContent = '-';
+                    if (!isProcessing) {
+                        currentCityContainer.classList.add('hidden');
+                    }
+                }
+                
+                // Update stats
+                if (data.stats) {
+                    citiesStats.textContent = `${data.stats.cities_processed} / ${data.stats.total_cities}`;
+                    hexagonsStats.textContent = `${data.stats.hexagons_processed} / ${data.stats.total_hexagons}`;
+                    placesStats.textContent = data.stats.places_processed;
+                    apiCallsStats.textContent = data.stats.api_calls;
+                }
+                
+                // Enable download buttons if we have results
+                downloadWithEmailsBtn.disabled = data.businesses_with_email === 0;
+                downloadWithoutEmailsBtn.disabled = data.businesses_without_email === 0;
+                
+                // Check if process is complete
+                if (!data.running && isProcessing) {
+                    isProcessing = false;
+                    startBtn.disabled = false;
+                    stopBtn.classList.add('hidden');
+                    stopProgressPolling();
+                    
+                    // Hide the current city container when process is complete
+                    currentCityContainer.classList.add('hidden');
+                    currentCityContainer.classList.remove('pulse-animation');
+                    
+                    if (progress >= 100) {
+                        showSuccess('Process completed successfully!');
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching progress:', error);
+            }
+        }
+        
+        // Initialize
+        downloadWithEmailsBtn.disabled = true;
+        downloadWithoutEmailsBtn.disabled = true;
+    </script>
 </body>
 </html>
 
