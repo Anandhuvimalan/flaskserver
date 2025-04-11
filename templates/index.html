@@ -39,6 +39,64 @@
                 box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
             }
         }
+        #map {
+            height: 300px;
+            width: 100%;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+        }
+        /* Boundary selection styles */
+        .boundary-item {
+            padding: 0.5rem;
+            margin-bottom: 0.25rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .boundary-item:hover {
+            background-color: #f3f4f6;
+        }
+        .boundary-item.selected {
+            background-color: #d1fae5;
+            border-left: 3px solid #10b981;
+        }
+        .boundary-selection-container {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        .selection-controls {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.5rem;
+        }
+        .selection-button {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            background-color: #f3f4f6;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .selection-button:hover {
+            background-color: #e5e7eb;
+        }
+        .search-container {
+            margin-top: 0.5rem;
+            position: relative;
+        }
+        .search-container input {
+            padding-left: 2rem;
+        }
+        .search-icon {
+            position: absolute;
+            left: 0.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+        }
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -80,15 +138,54 @@
                         </div>
                         
                         <div>
-                            <label for="cities-csv" class="block text-sm font-medium text-gray-700 mb-1">Cities CSV File</label>
+                            <label for="h3-resolution" class="block text-sm font-medium text-gray-700 mb-1">Hexagon Resolution</label>
+                            <select id="h3-resolution" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                                <option value="6">Large (Res 6) - ~3.2km edge</option>
+                                <option value="7" selected>Medium (Res 7) - ~1.2km edge</option>
+                                <option value="8">Small (Res 8) - ~0.46km edge</option>
+                            </select>
+                            <p class="text-xs text-gray-500 mt-1">Smaller hexagons provide more precise coverage but increase processing time</p>
+                        </div>
+                        
+                        <div>
+                            <label for="geojson-file" class="block text-sm font-medium text-gray-700 mb-1">GeoJSON File</label>
                             <div class="flex items-center">
-                                <input type="file" id="cities-csv" accept=".csv" class="hidden">
+                                <input type="file" id="geojson-file" accept=".geojson,.json" class="hidden">
                                 <button id="upload-btn" class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
                                     <i class="fas fa-cloud-upload-alt mr-2"></i>
-                                    <span id="file-name">Upload CSV</span>
+                                    <span id="file-name">Upload GeoJSON</span>
                                 </button>
                             </div>
-                            <p class="text-xs text-gray-500 mt-1">CSV should have columns: city, lat, lng</p>
+                            <p class="text-xs text-gray-500 mt-1">GeoJSON file with district or region boundaries</p>
+                        </div>
+                        
+                        <!-- Boundary Selection Section -->
+                        <div id="boundary-info" class="hidden p-3 bg-blue-50 rounded-md">
+                            <p class="text-sm font-medium text-blue-800" id="boundary-type-text"></p>
+                            <p class="text-sm text-blue-700" id="boundary-count-text"></p>
+                            
+                            <!-- Boundary Selection Controls -->
+                            <div class="mt-2">
+                                <label class="block text-sm font-medium text-blue-800 mb-1">Select Boundaries to Process</label>
+                                
+                                <!-- Search Box -->
+                                <div class="search-container">
+                                    <i class="fas fa-search search-icon"></i>
+                                    <input type="text" id="boundary-search" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Search boundaries...">
+                                </div>
+                                
+                                <!-- Selection Controls -->
+                                <div class="selection-controls">
+                                    <button id="select-all-btn" class="selection-button">Select All</button>
+                                    <button id="deselect-all-btn" class="selection-button">Deselect All</button>
+                                    <span id="selected-count" class="text-xs text-blue-700">0 selected</span>
+                                </div>
+                                
+                                <!-- Boundary List -->
+                                <div class="boundary-selection-container mt-2">
+                                    <ul id="boundary-list" class="text-xs text-blue-600"></ul>
+                                </div>
+                            </div>
                         </div>
                         
                         <button id="start-btn" class="w-full bg-emerald-600 text-white py-3 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center">
@@ -113,15 +210,22 @@
                         <p id="error-message" class="text-sm text-red-800"></p>
                     </div>
                     
-                    <!-- Current City Display -->
-                    <div id="current-city-container" class="mb-6 p-4 rounded-md bg-blue-50 border border-blue-100 hidden">
+                    <!-- Current Boundary Display -->
+                    <div id="current-boundary-container" class="mb-6 p-4 rounded-md bg-blue-50 border border-blue-100 hidden">
                         <div class="flex items-center">
                             <i class="fas fa-map-marker-alt text-blue-600 mr-3"></i>
                             <div>
                                 <p class="text-sm text-gray-600">Currently processing:</p>
-                                <p id="current-city-name" class="text-lg font-semibold text-blue-800">-</p>
+                                <p id="current-boundary-name" class="text-lg font-semibold text-blue-800">-</p>
+                                <p id="current-hexagon-id" class="text-sm text-blue-600 mt-1">-</p>
                             </div>
                         </div>
+                    </div>
+                    
+                    <!-- Map Preview -->
+                    <div id="map-container" class="mb-6">
+                        <h3 class="text-md font-semibold text-gray-700 mb-2">Map Preview</h3>
+                        <div id="map"></div>
                     </div>
                     
                     <div class="space-y-6">
@@ -206,8 +310,8 @@
                     
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div class="bg-gray-50 p-3 rounded-lg">
-                            <p class="text-xs text-gray-500">Cities</p>
-                            <p id="cities-stats" class="text-sm font-medium text-gray-800">0 / 0</p>
+                            <p class="text-xs text-gray-500">Boundaries</p>
+                            <p id="boundaries-stats" class="text-sm font-medium text-gray-800">0 / 0</p>
                         </div>
                         <div class="bg-gray-50 p-3 rounded-lg">
                             <p class="text-xs text-gray-500">Hexagons</p>
@@ -238,7 +342,8 @@
         const apiKeyInput = document.getElementById('api-key');
         const targetResultsInput = document.getElementById('target-results');
         const searchQueryInput = document.getElementById('search-query');
-        const fileInput = document.getElementById('cities-csv');
+        const h3ResolutionSelect = document.getElementById('h3-resolution');
+        const fileInput = document.getElementById('geojson-file');
         const uploadBtn = document.getElementById('upload-btn');
         const fileNameSpan = document.getElementById('file-name');
         const startBtn = document.getElementById('start-btn');
@@ -253,23 +358,773 @@
         const withoutEmailsCount = document.getElementById('without-emails-count');
         const errorContainer = document.getElementById('error-container');
         const errorMessage = document.getElementById('error-message');
-        const currentCityContainer = document.getElementById('current-city-container');
-        const currentCityName = document.getElementById('current-city-name');
-        const citiesStats = document.getElementById('cities-stats');
+        const currentBoundaryContainer = document.getElementById('current-boundary-container');
+        const currentBoundaryName = document.getElementById('current-boundary-name');
+        const currentHexagonId = document.getElementById('current-hexagon-id');
+        const boundariesStats = document.getElementById('boundaries-stats');
         const hexagonsStats = document.getElementById('hexagons-stats');
         const placesStats = document.getElementById('places-stats');
         const apiCallsStats = document.getElementById('api-calls-stats');
+        const boundaryInfo = document.getElementById('boundary-info');
+        const boundaryTypeText = document.getElementById('boundary-type-text');
+        const boundaryCountText = document.getElementById('boundary-count-text');
+        const boundaryList = document.getElementById('boundary-list');
+        const mapContainer = document.getElementById('map-container');
+        
+        // Boundary selection elements
+        const boundarySearch = document.getElementById('boundary-search');
+        const selectAllBtn = document.getElementById('select-all-btn');
+        const deselectAllBtn = document.getElementById('deselect-all-btn');
+        const selectedCount = document.getElementById('selected-count');
         
         // Variables
         let uploadedFileName = null;
         let isProcessing = false;
         let progressInterval = null;
+        let map = null;
+        let boundaryPolygons = [];
+        let hexagonPolygons = [];
+        let currentBoundaryPolygon = null;
+        let currentHexagonPolygon = null;
+        let currentStateInterval = null;
+        let allBoundaries = [];  // Store all boundaries from the GeoJSON
+        let selectedBoundaries = new Set();  // Store selected boundary indices
+        let googleMapsScript = null;
+        let visibleBoundaries = [];  // Cache for visible boundaries after filtering
         
+        // Utility functions
+        
+        // Debounce function to limit how often a function can be called
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                const context = this;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), wait);
+            };
+        }
+        
+        // Throttle function to limit how often a function can be called
+        function throttle(func, limit) {
+            let inThrottle;
+            return function(...args) {
+                const context = this;
+                if (!inThrottle) {
+                    func.apply(context, args);
+                    inThrottle = true;
+                    setTimeout(() => inThrottle = false, limit);
+                }
+            };
+        }
+        
+        // Optimize the filterBoundaries function
+        function filterBoundaries(searchText) {
+            const lowerSearchText = searchText.toLowerCase();
+            
+            // Reset visible boundaries cache
+            visibleBoundaries = [];
+            
+            // Use DocumentFragment for better performance when updating the DOM
+            const fragment = document.createDocumentFragment();
+            let matchCount = 0;
+            
+            // Get all boundary items once
+            const boundaryItems = document.querySelectorAll('.boundary-item');
+            
+            // If search text is empty, show all boundaries
+            if (!lowerSearchText) {
+                boundaryItems.forEach(item => {
+                    item.style.display = 'block';
+                    visibleBoundaries.push(parseInt(item.getAttribute('data-index')));
+                    matchCount++;
+                });
+                
+                // Update UI with match count
+                document.getElementById('boundary-count-text').textContent = 
+                    `Found ${matchCount} boundaries`;
+                return;
+            }
+            
+            // Process boundaries in batches for better performance
+            const batchSize = 50;
+            const totalItems = boundaryItems.length;
+            
+            // Process the first batch immediately
+            processBatch(0);
+            
+            function processBatch(startIndex) {
+                const endIndex = Math.min(startIndex + batchSize, totalItems);
+                
+                for (let i = startIndex; i < endIndex; i++) {
+                    const item = boundaryItems[i];
+                    const boundaryName = item.getAttribute('data-name').toLowerCase();
+                    const boundaryRegion = item.getAttribute('data-region').toLowerCase();
+                    const boundaryDistrict = item.getAttribute('data-district').toLowerCase();
+                    
+                    // Show item if any of the fields START WITH the search text
+                    const shouldShow = boundaryName.startsWith(lowerSearchText) || 
+                                      boundaryRegion.startsWith(lowerSearchText) || 
+                                      boundaryDistrict.startsWith(lowerSearchText);
+                    
+                    item.style.display = shouldShow ? 'block' : 'none';
+                    
+                    if (shouldShow) {
+                        visibleBoundaries.push(parseInt(item.getAttribute('data-index')));
+                        matchCount++;
+                    }
+                }
+                
+                // If there are more items to process, schedule the next batch
+                if (endIndex < totalItems) {
+                    setTimeout(() => processBatch(endIndex), 0);
+                } else {
+                    // Update UI with match count when all batches are processed
+                    document.getElementById('boundary-count-text').textContent = 
+                        `Found ${matchCount} matching boundaries`;
+                }
+            }
+        }
+        
+        // Create a debounced version of filterBoundaries
+        const debouncedFilterBoundaries = debounce(filterBoundaries, 300);
+        
+        // Optimize the selectAllBoundaries function
+        function selectAllBoundaries() {
+            // If we have filtered boundaries, only select visible ones
+            if (visibleBoundaries.length > 0) {
+                visibleBoundaries.forEach(index => {
+                    selectedBoundaries.add(index);
+                    const boundaryItem = document.getElementById(`boundary-${index}`);
+                    if (boundaryItem) {
+                        boundaryItem.classList.add('selected');
+                    }
+                });
+            } else {
+                // Otherwise select all boundaries
+                allBoundaries.forEach(boundary => {
+                    selectedBoundaries.add(boundary.index);
+                    const boundaryItem = document.getElementById(`boundary-${boundary.index}`);
+                    if (boundaryItem) {
+                        boundaryItem.classList.add('selected');
+                    }
+                });
+            }
+            updateSelectedCount();
+        }
+        
+        // Optimize the updateMap function
+        function updateMap(geojsonData) {
+            if (!map) {
+                initMap();
+                return; // Wait for map to initialize
+            }
+        
+            // Clear existing polygons
+            clearMapPolygons();
+        
+            // Add boundaries to the map
+            const boundaries = geojsonData.features.filter(f => f.properties.type === 'boundary');
+            const hexagons = geojsonData.features.filter(f => f.properties.type === 'hexagon');
+        
+            // Create bounds object for map fitting
+            const bounds = new google.maps.LatLngBounds();
+            let boundaryCount = 0;
+        
+            // Process boundaries in batches for better performance
+            const processBoundaries = (startIndex) => {
+                const batchSize = 5; // Process 5 boundaries at a time
+                const endIndex = Math.min(startIndex + batchSize, boundaries.length);
+            
+                for (let i = startIndex; i < endIndex; i++) {
+                    const boundary = boundaries[i];
+                    processBoundary(boundary, bounds);
+                    boundaryCount++;
+                }
+            
+                // If there are more boundaries to process, schedule the next batch
+                if (endIndex < boundaries.length) {
+                    setTimeout(() => processBoundaries(endIndex), 0);
+                } else {
+                    // All boundaries processed, now process hexagons
+                    processHexagons(0);
+                
+                    // Fit map to bounds if we have boundaries
+                    if (boundaryCount > 0) {
+                        map.fitBounds(bounds);
+                    }
+                }
+            };
+        
+            // Process a single boundary
+            const processBoundary = (boundary, bounds) => {
+                try {
+                    const polygon = new google.maps.Data.Feature({
+                        geometry: new google.maps.Data.GeoJson(boundary.geometry),
+                        properties: boundary.properties
+                    });
+                
+                    const boundaryLayer = new google.maps.Data();
+                    boundaryLayer.addFeature(polygon);
+                
+                    boundaryLayer.setStyle({
+                        fillColor: '#3B82F6',
+                        strokeColor: '#1D4ED8',
+                        strokeWeight: 2,
+                        fillOpacity: 0.2
+                    });
+                
+                    // Add info window on click
+                    boundaryLayer.addListener('click', function(event) {
+                        const props = event.feature.getProperty('properties') || boundary.properties;
+                        const infoWindow = new google.maps.InfoWindow({
+                            content: `
+                                <div style="padding: 8px;">
+                                    <h3 style="margin: 0 0 8px 0; font-weight: bold;">${props.name}</h3>
+                                    <p style="margin: 0 0 4px 0;"><strong>Country:</strong> ${props.country || 'N/A'}</p>
+                                    <p style="margin: 0 0 4px 0;"><strong>Region:</strong> ${props.region || 'N/A'}</p>
+                                    <p style="margin: 0 0 4px 0;"><strong>District:</strong> ${props.district || 'N/A'}</p>
+                                    <p style="margin: 0;"><strong>Type:</strong> ${props.boundary_type || 'N/A'}</p>
+                                </div>
+                            `,
+                            position: event.latLng
+                        });
+                        infoWindow.open(map);
+                    });
+                
+                    boundaryLayer.setMap(map);
+                    boundaryPolygons.push(boundaryLayer);
+                
+                    // Extend bounds with this boundary
+                    boundaryLayer.forEach(feature => {
+                        feature.getGeometry().forEachLatLng(latlng => {
+                            bounds.extend(latlng);
+                        });
+                    });
+                } catch (error) {
+                    console.error("Error processing boundary:", error);
+                }
+            };
+        
+            // Process hexagons in batches
+            const processHexagons = (startIndex) => {
+                const batchSize = 100; // Process 100 hexagons at a time
+                const endIndex = Math.min(startIndex + batchSize, hexagons.length);
+            
+                for (let i = startIndex; i < endIndex; i++) {
+                    const hexagon = hexagons[i];
+                    if (hexagon.geometry.type === 'Point') {
+                        processHexagon(hexagon);
+                    }
+                }
+            
+                // If there are more hexagons to process, schedule the next batch
+                if (endIndex < hexagons.length) {
+                    setTimeout(() => processHexagons(endIndex), 0);
+                }
+            };
+        
+            // Process a single hexagon
+            const processHexagon = (hexagon) => {
+                try {
+                    const coords = hexagon.geometry.coordinates;
+                    const marker = new google.maps.Marker({
+                        position: { lat: coords[1], lng: coords[0] },
+                        map: map,
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            scale: 3,
+                            fillColor: '#10B981',
+                            fillOpacity: 0.6,
+                            strokeWeight: 0
+                        },
+                        title: hexagon.properties.h3_index
+                    });
+                
+                    // Add click listener to show hexagon info
+                    marker.addListener('click', function() {
+                        const infoWindow = new google.maps.InfoWindow({
+                            content: `
+                                <div style="padding: 8px;">
+                                    <h3 style="margin: 0 0 8px 0; font-weight: bold;">Hexagon Info</h3>
+                                    <p style="margin: 0 0 4px 0;"><strong>H3 Index:</strong> ${hexagon.properties.h3_index}</p>
+                                    <p style="margin: 0 0 4px 0;"><strong>Latitude:</strong> ${coords[1].toFixed(6)}</p>
+                                    <p style="margin: 0;"><strong>Longitude:</strong> ${coords[0].toFixed(6)}</p>
+                                </div>
+                            `,
+                            position: { lat: coords[1], lng: coords[0] }
+                        });
+                        infoWindow.open(map);
+                    });
+                
+                    hexagonPolygons.push(marker);
+                } catch (error) {
+                    console.error("Error processing hexagon:", error);
+                }
+            };
+        
+            // Start processing boundaries
+            processBoundaries(0);
+        
+            // Show the map container
+            mapContainer.classList.remove('hidden');
+        }
+        
+        // Optimize the updateCurrentStateMap function
+        function updateCurrentStateMap(geojsonData) {
+            // Check if Google Maps API is loaded
+            if (typeof google === 'undefined' || typeof google.maps === 'undefined') {
+                console.log("Google Maps API not loaded yet. Will try again later.");
+                setTimeout(() => updateCurrentStateMap(geojsonData), 1000);
+                return;
+            }
+
+            if (!map) {
+                initMap();
+                setTimeout(() => updateCurrentStateMap(geojsonData), 500);
+                return;
+            }
+        
+            // Clear existing polygons
+            clearMapPolygons();
+        
+            // Add boundaries to the map
+            const boundaries = geojsonData.features.filter(f => f.properties.type === 'boundary');
+            const hexagons = geojsonData.features.filter(f => f.properties.type === 'hexagon');
+        
+            // Process boundaries
+            if (boundaries.length > 0) {
+                const boundary = boundaries[0]; // We usually only have one boundary
+            
+                // Create a GeoJSON feature for the boundary
+                const boundaryGeoJson = {
+                    type: "Feature",
+                    geometry: boundary.geometry,
+                    properties: boundary.properties
+                };
+            
+                // Add the boundary to the map
+                map.data.addGeoJson(boundaryGeoJson);
+            
+                // Style the boundary
+                map.data.setStyle(feature => {
+                    const properties = feature.getProperties();
+                    if (properties.type === 'boundary') {
+                        return {
+                            fillColor: '#3B82F6',
+                            strokeColor: '#1D4ED8',
+                            strokeWeight: 3,
+                            fillOpacity: 0.1
+                        };
+                    }
+                    return {};
+                });
+            
+                // Fit map to the boundary
+                const bounds = new google.maps.LatLngBounds();
+                map.data.forEach(feature => {
+                    if (feature.getProperty('type') === 'boundary') {
+                        const geometry = feature.getGeometry();
+                        if (geometry) {
+                            geometry.forEachLatLng(latlng => {
+                                bounds.extend(latlng);
+                            });
+                        }
+                    }
+                });
+                map.fitBounds(bounds);
+            }
+        
+            // Group hexagons by status for batch processing
+            const hexagonsByStatus = {
+                'processed': [],
+                'current': [],
+                'pending': []
+            };
+        
+            hexagons.forEach(hexagon => {
+                if (hexagon.geometry.type === 'Polygon') {
+                    const status = hexagon.properties.status || 'pending';
+                    hexagonsByStatus[status].push(hexagon);
+                }
+            });
+        
+            // Process hexagons in batches by status
+            // Process current first, then processed, then pending
+            const processHexagonBatch = (hexagons, status, startIndex = 0) => {
+                const batchSize = 20; // Process 20 hexagons at a time
+                const endIndex = Math.min(startIndex + batchSize, hexagons.length);
+            
+                for (let i = startIndex; i < endIndex; i++) {
+                    processHexagon(hexagons[i], status);
+                }
+            
+                // If there are more hexagons to process, schedule the next batch
+                if (endIndex < hexagons.length) {
+                    setTimeout(() => processHexagonBatch(hexagons, status, endIndex), 0);
+                } else if (status === 'current') {
+                    // When done with current, process processed
+                    setTimeout(() => processHexagonBatch(hexagonsByStatus['processed'], 'processed'), 0);
+                } else if (status === 'processed') {
+                    // When done with processed, process pending
+                    setTimeout(() => processHexagonBatch(hexagonsByStatus['pending'], 'pending'), 0);
+                }
+            };
+        
+            // Process a single hexagon
+            const processHexagon = (hexagon, status) => {
+                try {
+                    const coords = hexagon.geometry.coordinates[0];
+                    const hexCoords = coords.map(coord => {
+                        return { lat: coord[1], lng: coord[0] };
+                    });
+                
+                    // Set colors based on status
+                    let strokeColor, fillColor, strokeWeight, fillOpacity;
+                
+                    switch(status) {
+                        case 'processed':
+                            // Completed hexagons - Yellow
+                            strokeColor = '#EAB308'; // Yellow-500
+                            fillColor = '#FEF08A';   // Yellow-200
+                            strokeWeight = 1;
+                            fillOpacity = 0.6;
+                            break;
+                        case 'current':
+                            // Currently processing - Red
+                            strokeColor = '#EF4444'; // Red-500
+                            fillColor = '#FEE2E2';   // Red-100
+                            strokeWeight = 3;
+                            fillOpacity = 0.7;
+                            break;
+                        default:
+                            // Pending hexagons - Blue
+                            strokeColor = '#3B82F6'; // Blue-500
+                            fillColor = '#DBEAFE';   // Blue-100
+                            strokeWeight = 1;
+                            fillOpacity = 0.4;
+                    }
+                
+                    const hexPolygon = new google.maps.Polygon({
+                        paths: hexCoords,
+                        strokeColor: strokeColor,
+                        strokeOpacity: 1.0,
+                        strokeWeight: strokeWeight,
+                        fillColor: fillColor,
+                        fillOpacity: fillOpacity,
+                        map: map
+                    });
+                
+                    // Add hover event to show hexagon info
+                    const hexId = hexagon.properties.h3_index || '';
+                
+                    // Add hover events - use one infoWindow for all hexagons
+                    const infoWindow = new google.maps.InfoWindow({
+                        disableAutoPan: true
+                    });
+                
+                    hexPolygon.addListener('mouseover', function(e) {
+                        const statusText = {
+                            'processed': 'Completed',
+                            'current': 'Currently Processing',
+                            'pending': 'Pending'
+                        }[status] || 'Unknown';
+                    
+                        infoWindow.setContent(`
+                            <div style="padding: 8px;">
+                                <h3 style="margin: 0 0 8px 0; font-weight: bold;">Hexagon Info</h3>
+                                <p style="margin: 0 0 4px 0;"><strong>H3 Index:</strong> ${hexId}</p>
+                                <p style="margin: 0;"><strong>Status:</strong> ${statusText}</p>
+                            </div>
+                        `);
+                        infoWindow.setPosition(e.latLng);
+                        infoWindow.open(map);
+                    });
+                
+                    hexPolygon.addListener('mouseout', function() {
+                        infoWindow.close();
+                    });
+                
+                    hexagonPolygons.push(hexPolygon);
+                
+                    if (status === 'current') {
+                        currentHexagonPolygon = hexPolygon;
+                    }
+                } catch (error) {
+                    console.error("Error rendering hexagon:", error);
+                }
+            };
+        
+            // Start with current hexagons
+            if (hexagonsByStatus['current'].length > 0) {
+                processHexagonBatch(hexagonsByStatus['current'], 'current');
+            } else {
+                // If no current hexagons, start with processed
+                processHexagonBatch(hexagonsByStatus['processed'], 'processed');
+            }
+        
+            // Show the map container
+            mapContainer.classList.remove('hidden');
+        }
+        
+        // Optimize the fetchProgress function
+        async function fetchProgress() {
+            try {
+                const response = await fetch('/progress');
+                const data = await response.json();
+            
+                // Update UI only if values have changed
+                updateProgressUI(data);
+            
+                // Check if process is still running
+                if (!data.running && isProcessing) {
+                    isProcessing = false;
+                    startBtn.disabled = false;
+                    stopBtn.classList.add('hidden');
+                
+                    // Hide the current boundary container
+                    currentBoundaryContainer.classList.add('hidden');
+                    currentBoundaryContainer.classList.remove('pulse-animation');
+                
+                    // Stop polling
+                    stopProgressPolling();
+                    stopCurrentStatePolling();
+                
+                    // Show success message if process completed
+                    if (Math.round(data.progress) >= 100) {
+                        showSuccess('Process completed successfully! You can download the results.');
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching progress:', error);
+            }
+        }
+        
+        // Helper function to update UI elements only if values have changed
+        function updateProgressUI(data) {
+            // Cache previous values to avoid unnecessary DOM updates
+            const progress = Math.round(data.progress);
+        
+            // Update progress bar and text
+            if (progressBar.style.width !== `${progress}%`) {
+                progressBar.style.width = `${progress}%`;
+                progressPercent.textContent = `${progress}%`;
+            }
+        
+            // Update status text
+            if (statusText.textContent !== data.status) {
+                statusText.textContent = data.status;
+            }
+        
+            // Update email counts
+            if (withEmailsCount.textContent !== data.businesses_with_email.toString()) {
+                withEmailsCount.textContent = data.businesses_with_email;
+            }
+        
+            if (withoutEmailsCount.textContent !== data.businesses_without_email.toString()) {
+                withoutEmailsCount.textContent = data.businesses_without_email;
+            }
+        
+            // Update current boundary name if available
+            if (data.current_boundary) {
+                if (currentBoundaryName.textContent !== data.current_boundary) {
+                    currentBoundaryName.textContent = data.current_boundary;
+                }
+                currentBoundaryContainer.classList.remove('hidden');
+            
+                // Update current hexagon ID if available
+                if (data.current_hexagon) {
+                    const hexText = `Hexagon: ${data.current_hexagon}`;
+                    if (currentHexagonId.textContent !== hexText) {
+                        currentHexagonId.textContent = hexText;
+                    }
+                } else if (currentHexagonId.textContent !== '-') {
+                    currentHexagonId.textContent = '-';
+                }
+            } else if (!currentBoundaryContainer.classList.contains('hidden')) {
+                currentBoundaryContainer.classList.add('hidden');
+            }
+        
+            // Update stats
+            const boundariesText = `${data.stats.boundaries_processed} / ${data.stats.total_boundaries}`;
+            if (boundariesStats.textContent !== boundariesText) {
+                boundariesStats.textContent = boundariesText;
+            }
+        
+            const hexagonsText = `${data.stats.hexagons_processed} / ${data.stats.total_hexagons}`;
+            if (hexagonsStats.textContent !== hexagonsText) {
+                hexagonsStats.textContent = hexagonsText;
+            }
+        
+            if (placesStats.textContent !== data.stats.places_processed.toString()) {
+                placesStats.textContent = data.stats.places_processed;
+            }
+        
+            if (apiCallsStats.textContent !== data.stats.api_calls.toString()) {
+                apiCallsStats.textContent = data.stats.api_calls;
+            }
+        
+            // Enable download buttons if there are results
+            if (data.businesses_with_email > 0 && downloadWithEmailsBtn.disabled) {
+                downloadWithEmailsBtn.disabled = false;
+            }
+        
+            if (data.businesses_without_email > 0 && downloadWithoutEmailsBtn.disabled) {
+                downloadWithoutEmailsBtn.disabled = false;
+            }
+        }
+        
+        // Optimize the fetchCurrentState function
+        const fetchCurrentState = throttle(async function() {
+            if (!isProcessing) return;
+        
+            try {
+                // Check if we have a current state GeoJSON
+                const response = await fetch('/progress');
+                const data = await response.json();
+            
+                if (data.current_state_geojson) {
+                    // Fetch the GeoJSON data
+                    const geojsonResponse = await fetch('/current_state');
+                    if (geojsonResponse.ok) {
+                        const geojsonData = await geojsonResponse.json();
+                        updateCurrentStateMap(geojsonData);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching current state:', error);
+            }
+        }, 3000); // Throttle to once every 3 seconds
+        
+        // Event listeners
+        // Use event delegation where possible to reduce the number of event listeners
+        
+        // Boundary search with debounce
+        boundarySearch.addEventListener('input', (e) => {
+            debouncedFilterBoundaries(e.target.value);
+        });
+        
+        // Add these event listeners after the existing event listeners section, before the "Initialize" section
+
+        // Load Google Maps API when API key is entered
+        apiKeyInput.addEventListener('change', function() {
+            const apiKey = apiKeyInput.value.trim();
+            if (apiKey && !googleMapsScript) {
+                // Load Google Maps API
+                googleMapsScript = document.createElement('script');
+                googleMapsScript.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=initMap`;
+                googleMapsScript.async = true;
+                googleMapsScript.defer = true;
+                document.head.appendChild(googleMapsScript);
+                
+                // Enable start button if file is also uploaded
+                if (uploadedFileName) {
+                    startBtn.disabled = false;
+                }
+            }
+        });
+
+        // Initialize Google Maps
+        function initMap() {
+            // Only initialize if Google Maps API is loaded and map doesn't exist yet
+            if (typeof google !== 'undefined' && typeof google.maps !== 'undefined' && !map) {
+                map = new google.maps.Map(document.getElementById('map'), {
+                    center: { lat: -41.0, lng: 174.0 }, // Center on New Zealand
+                    zoom: 5
+                });
+            } else if (!map) {
+                console.log("Google Maps API not loaded yet, map initialization deferred");
+            }
+        }
+
+        // Clear all polygons from the map
+        function clearMapPolygons() {
+            // Clear boundaries
+            boundaryPolygons.forEach(polygon => {
+                polygon.setMap(null);
+            });
+            boundaryPolygons = [];
+            
+            // Clear hexagons
+            hexagonPolygons.forEach(hexagon => {
+                hexagon.setMap(null);
+            });
+            hexagonPolygons = [];
+            
+            currentBoundaryPolygon = null;
+            currentHexagonPolygon = null;
+        }
+
+        // Boundary selection functions
+        function updateSelectedCount() {
+            selectedCount.textContent = `${selectedBoundaries.size} selected`;
+        }
+
+        function toggleBoundarySelection(index) {
+            if (selectedBoundaries.has(index)) {
+                selectedBoundaries.delete(index);
+            } else {
+                selectedBoundaries.add(index);
+            }
+            updateSelectedCount();
+            
+            // Update UI to reflect selection state
+            const boundaryItem = document.getElementById(`boundary-${index}`);
+            if (boundaryItem) {
+                boundaryItem.classList.toggle('selected', selectedBoundaries.has(index));
+            }
+        }
+
+        function deselectAllBoundaries() {
+            selectedBoundaries.clear();
+            document.querySelectorAll('.boundary-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            updateSelectedCount();
+        }
+
+        // Populate boundary list with selectable items
+        function populateBoundaryList(boundaries) {
+            boundaryList.innerHTML = '';
+            allBoundaries = boundaries;
+            selectedBoundaries.clear();
+            
+            boundaries.forEach(boundary => {
+                const li = document.createElement('li');
+                li.id = `boundary-${boundary.index}`;
+                li.className = 'boundary-item';
+                li.setAttribute('data-index', boundary.index);
+                li.setAttribute('data-name', boundary.name);
+                li.setAttribute('data-region', boundary.region || '');
+                li.setAttribute('data-district', boundary.district || '');
+                
+                // Create content with name and region/district if available
+                let content = `<strong>${boundary.name}</strong>`;
+                if (boundary.region || boundary.district) {
+                    content += '<div class="text-gray-500 text-xs mt-1">';
+                    if (boundary.region) content += `Region: ${boundary.region}`;
+                    if (boundary.region && boundary.district) content += ' | ';
+                    if (boundary.district) content += `District: ${boundary.district}`;
+                    content += '</div>';
+                }
+                
+                li.innerHTML = content;
+                
+                // Add click handler for selection
+                li.addEventListener('click', () => {
+                    toggleBoundarySelection(boundary.index);
+                });
+                
+                boundaryList.appendChild(li);
+            });
+            
+            updateSelectedCount();
+        }
+
         // Event listeners
         uploadBtn.addEventListener('click', () => {
             fileInput.click();
         });
-        
+
         fileInput.addEventListener('change', async (e) => {
             if (e.target.files.length > 0) {
                 const file = e.target.files[0];
@@ -277,7 +1132,7 @@
                 
                 // Upload the file
                 const formData = new FormData();
-                formData.append('cities_csv', file);
+                formData.append('geojson_file', file);
                 
                 try {
                     uploadBtn.disabled = true;
@@ -292,20 +1147,41 @@
                     
                     if (data.error) {
                         showError(data.error);
+                        uploadBtn.disabled = false;
+                        uploadBtn.innerHTML = '<i class="fas fa-cloud-upload-alt mr-2"></i><span id="file-name">Upload GeoJSON</span>';
                     } else {
                         uploadedFileName = data.filename;
                         hideError();
                         showSuccess('File uploaded successfully!');
+                        
+                        // Show boundary info
+                        boundaryInfo.classList.remove('hidden');
+                        boundaryTypeText.textContent = `Type: ${data.boundary_type.charAt(0).toUpperCase() + data.boundary_type.slice(1)}`;
+                        boundaryCountText.textContent = `Found ${data.boundaries_count} boundaries`;
+                        
+                        // Populate boundary selection list
+                        populateBoundaryList(data.boundaries);
+                        
+                        // Enable start button if API key is also entered
+                        if (apiKeyInput.value.trim()) {
+                            startBtn.disabled = false;
+                        }
+                        
+                        uploadBtn.disabled = false;
+                        uploadBtn.innerHTML = '<i class="fas fa-check-circle mr-2"></i><span id="file-name">' + file.name + '</span>';
                     }
                 } catch (error) {
                     showError('Failed to upload file');
-                } finally {
                     uploadBtn.disabled = false;
-                    uploadBtn.innerHTML = '<i class="fas fa-cloud-upload-alt mr-2"></i><span id="file-name">' + fileNameSpan.textContent + '</span>';
+                    uploadBtn.innerHTML = '<i class="fas fa-cloud-upload-alt mr-2"></i><span id="file-name">Upload GeoJSON</span>';
                 }
             }
         });
-        
+
+        // Boundary selection event listeners
+        selectAllBtn.addEventListener('click', selectAllBoundaries);
+        deselectAllBtn.addEventListener('click', deselectAllBoundaries);
+
         startBtn.addEventListener('click', async () => {
             if (isProcessing) return;
             
@@ -315,7 +1191,12 @@
             }
             
             if (!uploadedFileName) {
-                return showError('Please upload a CSV file');
+                return showError('Please upload a GeoJSON file');
+            }
+            
+            // Check if any boundaries are selected
+            if (selectedBoundaries.size === 0) {
+                return showError('Please select at least one boundary to process');
             }
             
             hideError();
@@ -334,7 +1215,9 @@
                         api_key: apiKeyInput.value,
                         filename: uploadedFileName,
                         target_results: parseInt(targetResultsInput.value) || 100,
-                        search_query: searchQueryInput.value || 'restaurant'
+                        search_query: searchQueryInput.value || 'restaurant',
+                        h3_resolution: parseInt(h3ResolutionSelect.value) || 7,
+                        selected_boundaries: Array.from(selectedBoundaries)  // Convert Set to Array
                     })
                 });
                 
@@ -351,12 +1234,18 @@
                     startBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Start Processing';
                     stopBtn.classList.remove('hidden');
                     
-                    // Show the current city container
-                    currentCityContainer.classList.remove('hidden');
-                    currentCityContainer.classList.add('pulse-animation');
+                    // Show the current boundary container
+                    currentBoundaryContainer.classList.remove('hidden');
+                    currentBoundaryContainer.classList.add('pulse-animation');
+                    
+                    // Initialize the map
+                    initMap();
                     
                     // Start polling for progress
                     startProgressPolling();
+                    
+                    // Start polling for current state
+                    startCurrentStatePolling();
                 }
             } catch (error) {
                 showError('Failed to start process');
@@ -364,7 +1253,7 @@
                 startBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Start Processing';
             }
         });
-        
+
         stopBtn.addEventListener('click', async () => {
             if (!isProcessing) return;
             
@@ -379,6 +1268,7 @@
                     showError(data.error);
                 } else {
                     stopProgressPolling();
+                    stopCurrentStatePolling();
                     isProcessing = false;
                     startBtn.disabled = false;
                     stopBtn.classList.add('hidden');
@@ -387,9 +1277,9 @@
                     statusText.textContent = 'Stopped. Data is available for download.';
                     showSuccess('Process stopped. You can download the data collected so far.');
                     
-                    // Hide the current city container
-                    currentCityContainer.classList.add('hidden');
-                    currentCityContainer.classList.remove('pulse-animation');
+                    // Hide the current boundary container
+                    currentBoundaryContainer.classList.add('hidden');
+                    currentBoundaryContainer.classList.remove('pulse-animation');
                 }
             } catch (error) {
                 showError('Failed to stop process');
@@ -397,7 +1287,7 @@
                 stopBtn.innerHTML = '<i class="fas fa-stop-circle mr-2"></i>Stop Process';
             }
         });
-        
+
         resetBtn.addEventListener('click', async () => {
             try {
                 resetBtn.disabled = true;
@@ -412,28 +1302,45 @@
                     // Reset UI
                     isProcessing = false;
                     uploadedFileName = null;
-                    fileNameSpan.textContent = 'Upload CSV';
+                    fileNameSpan.textContent = 'Upload GeoJSON';
                     progressBar.style.width = '0%';
                     progressPercent.textContent = '0%';
                     statusText.textContent = 'Not started';
                     withEmailsCount.textContent = '0';
                     withoutEmailsCount.textContent = '0';
-                    citiesStats.textContent = '0 / 0';
+                    boundariesStats.textContent = '0 / 0';
                     hexagonsStats.textContent = '0 / 0';
                     placesStats.textContent = '0';
                     apiCallsStats.textContent = '0';
-                    startBtn.disabled = false;
+                    startBtn.disabled = true;
                     stopBtn.classList.add('hidden');
                     downloadWithEmailsBtn.disabled = true;
                     downloadWithoutEmailsBtn.disabled = true;
                     hideError();
                     
-                    // Hide the current city container
-                    currentCityContainer.classList.add('hidden');
-                    currentCityContainer.classList.remove('pulse-animation');
+                    // Reset boundary selection
+                    allBoundaries = [];
+                    selectedBoundaries.clear();
+                    boundaryList.innerHTML = '';
+                    updateSelectedCount();
+                    
+                    // Stop polling
+                    stopProgressPolling();
+                    stopCurrentStatePolling();
+                    
+                    // Hide the current boundary container
+                    currentBoundaryContainer.classList.add('hidden');
+                    currentBoundaryContainer.classList.remove('pulse-animation');
+                    
+                    // Hide boundary info
+                    boundaryInfo.classList.add('hidden');
+                    
+                    // Clear map
+                    clearMapPolygons();
                     
                     // Clear file input
                     fileInput.value = '';
+                    uploadBtn.innerHTML = '<i class="fas fa-cloud-upload-alt mr-2"></i><span id="file-name">Upload GeoJSON</span>';
                     
                     // Show success message
                     showSuccess('Reset successful. You can start a new process.');
@@ -445,7 +1352,7 @@
                 resetBtn.innerHTML = '<i class="fas fa-redo mr-2"></i>Reset';
             }
         });
-        
+
         downloadWithEmailsBtn.addEventListener('click', () => {
             downloadWithEmailsBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Downloading...';
             setTimeout(() => {
@@ -453,7 +1360,7 @@
                 downloadWithEmailsBtn.innerHTML = '<i class="fas fa-download mr-2"></i>Download With Emails';
             }, 500);
         });
-        
+
         downloadWithoutEmailsBtn.addEventListener('click', () => {
             downloadWithoutEmailsBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Downloading...';
             setTimeout(() => {
@@ -461,7 +1368,7 @@
                 downloadWithoutEmailsBtn.innerHTML = '<i class="fas fa-download mr-2"></i>Download Without Emails';
             }, 500);
         });
-        
+
         // Functions
         function showError(message) {
             errorContainer.classList.remove('hidden');
@@ -473,12 +1380,12 @@
             errorMessage.classList.add('text-red-800');
             errorMessage.textContent = message;
         }
-        
+
         function hideError() {
             errorContainer.classList.add('hidden');
             errorMessage.textContent = '';
         }
-        
+
         function showSuccess(message) {
             errorContainer.classList.remove('hidden');
             errorContainer.classList.remove('bg-red-50');
@@ -494,7 +1401,7 @@
                 hideError();
             }, 5000);
         }
-        
+
         function startProgressPolling() {
             // Clear any existing interval
             stopProgressPolling();
@@ -503,74 +1410,39 @@
             progressInterval = setInterval(fetchProgress, 2000);
             fetchProgress(); // Fetch immediately
         }
-        
+
         function stopProgressPolling() {
             if (progressInterval) {
                 clearInterval(progressInterval);
                 progressInterval = null;
             }
         }
-        
-        async function fetchProgress() {
-            try {
-                const response = await fetch('/progress');
-                const data = await response.json();
-                
-                // Update UI
-                const progress = Math.round(data.progress);
-                progressBar.style.width = `${progress}%`;
-                progressPercent.textContent = `${progress}%`;
-                statusText.textContent = data.status;
-                withEmailsCount.textContent = data.businesses_with_email;
-                withoutEmailsCount.textContent = data.businesses_without_email;
-                
-                // Update current city name if available
-                if (data.current_city) {
-                    currentCityName.textContent = data.current_city;
-                    currentCityContainer.classList.remove('hidden');
-                } else {
-                    currentCityName.textContent = '-';
-                    if (!isProcessing) {
-                        currentCityContainer.classList.add('hidden');
-                    }
-                }
-                
-                // Update stats
-                if (data.stats) {
-                    citiesStats.textContent = `${data.stats.cities_processed} / ${data.stats.total_cities}`;
-                    hexagonsStats.textContent = `${data.stats.hexagons_processed} / ${data.stats.total_hexagons}`;
-                    placesStats.textContent = data.stats.places_processed;
-                    apiCallsStats.textContent = data.stats.api_calls;
-                }
-                
-                // Enable download buttons if we have results
-                downloadWithEmailsBtn.disabled = data.businesses_with_email === 0;
-                downloadWithoutEmailsBtn.disabled = data.businesses_without_email === 0;
-                
-                // Check if process is complete
-                if (!data.running && isProcessing) {
-                    isProcessing = false;
-                    startBtn.disabled = false;
-                    stopBtn.classList.add('hidden');
-                    stopProgressPolling();
-                    
-                    // Hide the current city container when process is complete
-                    currentCityContainer.classList.add('hidden');
-                    currentCityContainer.classList.remove('pulse-animation');
-                    
-                    if (progress >= 100) {
-                        showSuccess('Process completed successfully!');
-                    }
-                }
-            } catch (error) {
-                console.error('Error fetching progress:', error);
+
+        function startCurrentStatePolling() {
+            // Clear any existing interval
+            stopCurrentStatePolling();
+            
+            // Start a new polling interval - poll every 3 seconds instead of 5
+            currentStateInterval = setInterval(fetchCurrentState, 3000);
+            fetchCurrentState(); // Fetch immediately
+        }
+
+        function stopCurrentStatePolling() {
+            if (currentStateInterval) {
+                clearInterval(currentStateInterval);
+                currentStateInterval = null;
             }
         }
         
         // Initialize
+        startBtn.disabled = true;
         downloadWithEmailsBtn.disabled = true;
         downloadWithoutEmailsBtn.disabled = true;
+        
+        // Check if Google Maps API is already loaded
+        if (typeof google !== 'undefined' && typeof google.maps !== 'undefined') {
+            initMap();
+        }
     </script>
 </body>
 </html>
-
